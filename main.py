@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import yfinance as yf
 import sqlite3
 from datetime import datetime
+import threading
+import time
 
 app = FastAPI()
 
@@ -62,5 +64,22 @@ def get_price_history():
     
     return {"history": [{"price": row[1], "timestamp": row[2]} for row in rows]}
 
+# Tâche de fond : récupérer et stocker un prix toutes les 5 minutes
+def fetch_price_every_5_minutes():
+    while True:
+        try:
+            ticker = yf.Ticker("ESE.PA")
+            data = ticker.history(period="1d")
+            if not data.empty:
+                latest_price = data["Close"].iloc[-1]
+                store_price(latest_price)
+                print(f"[{datetime.now()}] Prix stocké automatiquement : {latest_price}")
+        except Exception as e:
+            print(f"Erreur lors de la récupération automatique : {e}")
+        time.sleep(5 * 60)
+
 # Initialiser la base de données
 create_db()
+
+# Démarrer la tâche de fond automatique
+threading.Thread(target=fetch_price_every_5_minutes, daemon=True).start()
